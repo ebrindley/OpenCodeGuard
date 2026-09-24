@@ -49,10 +49,8 @@
   (literal (h "/Applications"))
   (regex #"/\.opencode(/|$)")
   (regex #"/opencode\.jsonc?$")
-  (regex #"/\.cc-safety-net(/|$)"))
-(allow file-write*
-  (regex #"/\.opencode/\.gitignore$")
-  (subpath (h "/.cc-safety-net/logs")))
+  (require-all (regex #"/\.cc-safety-net(/|$)") (require-not (subpath (h "/.cc-safety-net/logs")))))
+(allow file-write* (regex #"/\.opencode/\.gitignore$"))
 
 (deny lsopen)
 (deny job-creation)
