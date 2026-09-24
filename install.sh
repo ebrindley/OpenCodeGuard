@@ -1,17 +1,21 @@
 #!/bin/zsh
 # usage: install.sh [--projects DIR] [--gui]
 emulate -L zsh
-setopt err_exit no_unset pipe_fail
+setopt err_exit no_unset pipe_fail extended_glob
 
 src=${0:A:h}
 home=${HOME:A}
 engine="$home/Library/Application Support/OpenCodeGuard"
+state="$engine/state"
 list_dir="$home/OpenCode Guard"
 list="$list_dir/Guard List.txt"
 conf="$home/.config/opencode"
 launcher="$home/Applications/OpenCode Guarded.app"
 cc="$home/.cc-safety-net/rules"
+marker_start='# >>> opencode-guard >>>'
+marker_end='# <<< opencode-guard <<<'
 gui=0 projects=
+typeset -a warnings
 
 while (( $# )); do
   case $1 in
@@ -26,11 +30,24 @@ die() { print -ru2 -- "OpenCode Guard: $*"; exit 1 }
 say() { print -r -- "$*" }
 
 [[ $(uname -s) == Darwin ]] || die "macOS only"
-for t in /usr/bin/sandbox-exec /usr/bin/jq /usr/bin/osacompile /usr/bin/codesign; do
+for t in /usr/bin/sandbox-exec /usr/bin/jq /usr/bin/osacompile /usr/bin/codesign /usr/bin/curl; do
   [[ -x $t ]] || die "missing $t (macOS 15 or later required)"
 done
 
-/bin/mkdir -p "$engine/bin" "$engine/state"
+typeset -a configs
+for f in "$conf/config.json" "$conf/opencode.json" "$conf/opencode.jsonc"; do
+  [[ -e $f ]] || continue
+  if ! /usr/bin/jq -e 'type == "object"' "$f" >/dev/null 2>&1; then
+    warnings+=("${f:t} not changed (comments or invalid JSON): set permission edit, bash and external_directory to allow yourself")
+  elif /usr/bin/jq -e '.permission | type == "string"' "$f" >/dev/null; then
+    warnings+=("${f:t} not changed (permission is a single value)")
+  else
+    configs+=("$f")
+  fi
+done
+[[ -e $conf/config.json || -e $conf/opencode.json || -e $conf/opencode.jsonc ]] || configs=("$conf/opencode.json")
+
+/bin/mkdir -p "$engine/bin" "$state"
 /bin/cp "$src/engine/launch" "$src/engine/profile.sb" "$src/uninstall.sh" "$engine/"
 /bin/cp "$src/engine/opencode" "$src/engine/opencode-gui" "$engine/bin/"
 /bin/rm -rf "$engine/vendor"
@@ -54,55 +71,59 @@ if [[ -n $projects ]]; then
     /usr/bin/awk -v p="$projects" '{ print } !done && toupper($0) ~ /^ALLOW/ { print p; done = 1 }' "$list" > "$list.tmp"
     /bin/mv -f "$list.tmp" "$list"
   fi
+  /usr/bin/grep -Fxq -- "$projects" "$list" || die "no ALLOW heading in $list; add $projects under ALLOW yourself"
   say "allowed: $projects"
 fi
 say "list: $list"
 
 /bin/mkdir -p "$conf/plugins"
 /bin/cp "$src/plugin/opencode-guard.js" "$conf/plugins/opencode-guard.js"
-cfg="$conf/opencode.json"
-if [[ -e $cfg ]] && /usr/bin/jq -e '(.plugin // []) | map(tostring) | any(test("cc-safety-net"))' "$cfg" >/dev/null; then
-  say "cc-safety-net already configured in opencode.json; bundled copy not loaded"
-else
-  print -r -- "import plugin from \"file://${engine// /%20}/vendor/cc-safety-net/dist/index.js\"
-export default plugin" > "$conf/plugins/cc-safety-net.js"
-fi
 
 /bin/mkdir -p "$cc/opencode-guard"
 /bin/cp "$src/templates/cc-safety-net/rules/opencode-guard/rulebook.json" "$cc/opencode-guard/rulebook.json"
-if [[ -e $cc/rule.json ]]; then
-  /usr/bin/jq '.rules = ((.rules // []) + ["opencode-guard"] | unique)' "$cc/rule.json" > "$cc/rule.json.tmp"
+if [[ ! -e $cc/rule.json ]]; then
+  /bin/cp "$src/templates/cc-safety-net/rules/rule.json" "$cc/rule.json"
+elif /usr/bin/jq '.rules = ((.rules // []) + ["opencode-guard"] | unique)' "$cc/rule.json" > "$cc/rule.json.tmp" 2>/dev/null; then
   /bin/mv -f "$cc/rule.json.tmp" "$cc/rule.json"
 else
-  /bin/cp "$src/templates/cc-safety-net/rules/rule.json" "$cc/rule.json"
+  /bin/rm -f "$cc/rule.json.tmp"
+  warnings+=("$cc/rule.json not changed (invalid JSON): add opencode-guard to its rules")
 fi
 
-perm='{"edit":"allow","bash":"allow","external_directory":"allow"}'
-if [[ -e $cfg ]]; then
-  [[ -e $engine/state/opencode.json.orig ]] || /bin/cp "$cfg" "$engine/state/opencode.json.orig"
-  /usr/bin/jq --argjson p "$perm" '.permission = ((.permission // {}) | if type == "string" then {"*": .} else . end) + $p' "$cfg" > "$cfg.tmp"
-  /bin/mv -f "$cfg.tmp" "$cfg"
-elif [[ -e $conf/opencode.jsonc ]]; then
-  say "note: opencode.jsonc left unchanged; set permission edit, bash and external_directory to allow"
-else
-  /usr/bin/jq -n --argjson p "$perm" '{"$schema": "https://opencode.ai/config.json", permission: $p}' > "$cfg"
-fi
+record="$state/permissions.json"
+[[ -e $record ]] || print '{}' > "$record"
+for f in $configs; do
+  [[ -e $f ]] || print '{}' > "$f"
+  /usr/bin/jq --arg f "$f" --slurpfile c "$f" '
+    if has($f) then . else
+      .[$f] = (($c[0].permission // {}) as $p
+        | reduce ("edit", "bash", "external_directory") as $k ({}; .[$k] = {orig: (if $p | has($k) then $p[$k] else null end)}))
+    end' "$record" > "$record.tmp"
+  /bin/mv -f "$record.tmp" "$record"
+  /usr/bin/jq '.permission = ((.permission // {}) as $p | reduce ("edit", "bash", "external_directory") as $k ($p;
+      .[$k] = (if (.[$k] | type) == "object" then {"*": "allow"} + (.[$k] | del(.["*"])) else "allow" end)))' "$f" > "$f.tmp"
+  /bin/mv -f "$f.tmp" "$f"
+  /usr/bin/jq --arg f "$f" --slurpfile c "$f" '.[$f] |= with_entries(.value.wrote = $c[0].permission[.key])' "$record" > "$record.tmp"
+  /bin/mv -f "$record.tmp" "$record"
+done
 
 for rc in "$home/.zprofile" "$home/.zshrc" "$home/.bash_profile"; do
   [[ $rc == *bash_profile && ! -e $rc ]] && continue
-  [[ -e $rc ]] && /usr/bin/sed -i '' '/^# >>> opencode-guard >>>$/,/^# <<< opencode-guard <<<$/d' "$rc"
+  if [[ -e $rc ]] && /usr/bin/grep -Fxq -- "$marker_start" "$rc"; then
+    /usr/bin/grep -Fxq -- "$marker_end" "$rc" || { warnings+=("${rc:t} has an unfinished opencode-guard block; fix it by hand"); continue }
+    /usr/bin/sed -i '' "/^$marker_start\$/,/^$marker_end\$/d" "${rc:A}"
+  fi
+  [[ -s $rc && -n $(/usr/bin/tail -c1 "$rc") ]] && print >> "$rc"
   if [[ $rc == *bash_profile ]]; then
     line='PATH="$HOME/Library/Application Support/OpenCodeGuard/bin:$PATH"'
   else
     line='path=("$HOME/Library/Application Support/OpenCodeGuard/bin" ${path:#"$HOME/Library/Application Support/OpenCodeGuard/bin"})'
   fi
-  print -r -- $'# >>> opencode-guard >>>\n'"$line"$'\n# <<< opencode-guard <<<' >> "$rc"
+  print -r -- "$marker_start"$'\n'"$line"$'\n'"$marker_end" >> "$rc"
 done
 say "PATH: new terminal windows run opencode inside the guard"
 
-app=
-for a in /Applications/OpenCode.app "$home/Applications/OpenCode.app"; do [[ -d $a ]] && { app=$a; break }; done
-if [[ -n $app ]]; then
+if app=$("$engine/launch" find-app); then
   /bin/rm -rf "$launcher"
   /bin/mkdir -p "${launcher:h}"
   /usr/bin/osacompile -o "$launcher" -e "do shell script quoted form of \"$engine/bin/opencode-gui\" & \" >/dev/null 2>&1 &\""
@@ -118,8 +139,11 @@ fi
 say "self-test:"
 "$engine/launch" check || die "self-test failed"
 
+for w in $warnings; do say "warning: $w"; done
 if [[ $gui == 1 || -t 1 ]]; then
-  answer=$(/usr/bin/osascript -e 'button returned of (display dialog "OpenCode Guard is installed.\n\nOpen OpenCode with OpenCode Guarded, or type opencode in a new terminal window.\n\nEdit the allow and deny list now?" buttons {"Later", "Edit List"} default button "Edit List" with title "OpenCode Guard")' 2>/dev/null || true)
+  msg=$'OpenCode Guard is installed.\n\nOpen OpenCode with OpenCode Guarded, or type opencode in a new terminal window.'
+  (( $#warnings )) && msg+=$'\n\n'"${(pj:\n:)warnings}"
+  answer=$(/usr/bin/osascript -e 'on run argv' -e 'button returned of (display dialog (item 1 of argv) & return & return & "Edit the allow and deny list now?" buttons {"Later", "Edit List"} default button "Edit List" with title "OpenCode Guard")' -e 'end run' "$msg" 2>/dev/null || true)
   [[ $answer == "Edit List" ]] && /usr/bin/open -e "$list"
 fi
 say "done"

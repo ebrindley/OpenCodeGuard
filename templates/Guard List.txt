@@ -5,6 +5,8 @@ path starting with / or ~. Delete a line to remove it. Lines starting with # are
 ignored. Save, then quit and reopen OpenCode.
 
 When entries overlap, DENY always wins; otherwise the most specific entry wins.
+OpenCode can always write its own data, caches and temp files; the full list of
+what applied is in last-launch.log next to this file.
 
 ALLOW - agents may create, change and delete things inside these:
 
