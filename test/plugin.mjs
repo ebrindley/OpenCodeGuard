@@ -16,10 +16,11 @@ async function expect(want, name, tool, args) {
   if (!ok) failures++
 }
 
-if (mode === "unguarded") {
+if (mode === "unguarded" || mode === "symlinked") {
   await expect("blocked", "bash refused", "bash", { command: "ls" })
   await expect("blocked", "MCP tool refused", "github_create_issue", {})
-  await expect("allowed", "read allowed", "read", { filePath: "README.md" })
+  await expect("blocked", "read refused", "read", { filePath: "README.md" })
+  await expect("allowed", "question allowed", "question", {})
 } else if (mode === "bypass") {
   await expect("allowed", "bash allowed", "bash", { command: "ls" })
 } else {
@@ -33,6 +34,8 @@ if (mode === "unguarded") {
   await expect("blocked", "read DENY", "read", { filePath: "secret/key" })
   await expect("blocked", "grep DENY", "grep", { pattern: "x", path: `${home}/Documents/private` })
   await expect("blocked", "edit Guard List", "edit", { filePath: `${home}/OpenCode Guard/Guard List.txt` })
+  await expect("blocked", "project plugin", "write", { filePath: ".opencode/plugins/x.js" })
+  await expect("blocked", "project config", "edit", { filePath: "opencode.json" })
   await expect("blocked", "tilde outside", "write", { filePath: "~/.zshrc" })
   await expect("blocked", "patch mixed", "apply_patch", { patchText: "*** Begin Patch\n*** Add File: ok.txt\n+x\n*** Delete File: ../../Documents/private/doc\n*** End Patch" })
   await expect("allowed", "patch inside", "apply_patch", { patchText: "*** Begin Patch\n*** Update File: a.txt\n*** Move to: b/a.txt\n@@\n-x\n+y\n*** End Patch" })
