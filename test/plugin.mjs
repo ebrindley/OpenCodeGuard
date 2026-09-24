@@ -1,0 +1,40 @@
+import { realpathSync } from "node:fs"
+import { homedir } from "node:os"
+
+const [plugin, mode] = process.argv.slice(2)
+const { OpenCodeGuard } = await import(plugin)
+const home = realpathSync(homedir())
+const directory = `${home}/Projects/app`
+const hook = (await OpenCodeGuard({ directory }))["tool.execute.before"]
+let failures = 0
+
+async function expect(want, name, tool, args) {
+  let blocked = false
+  try { await hook({ tool }, { args }) } catch { blocked = true }
+  const ok = want === "blocked" ? blocked : !blocked
+  console.log(`${ok ? "ok  " : "FAIL"} plugin ${mode}: ${name}`)
+  if (!ok) failures++
+}
+
+if (mode === "unguarded") {
+  await expect("blocked", "bash refused", "bash", { command: "ls" })
+  await expect("blocked", "MCP tool refused", "github_create_issue", {})
+  await expect("allowed", "read allowed", "read", { filePath: "README.md" })
+} else if (mode === "bypass") {
+  await expect("allowed", "bash allowed", "bash", { command: "ls" })
+} else {
+  await expect("allowed", "bash allowed", "bash", { command: "ls" })
+  await expect("allowed", "edit in ALLOW", "edit", { filePath: "src/index.js" })
+  await expect("allowed", "write new file in ALLOW", "write", { filePath: `${home}/Projects/app/a/b/c.txt` })
+  await expect("blocked", "write outside lists", "write", { filePath: `${home}/Documents/x.txt` })
+  await expect("blocked", "write READ ONLY", "edit", { filePath: `${home}/Projects/archive/x.txt` })
+  await expect("allowed", "write ALLOW inside READ ONLY", "edit", { filePath: `${home}/Projects/archive/live/x.txt` })
+  await expect("blocked", "write DENY", "write", { filePath: "secret/key" })
+  await expect("blocked", "read DENY", "read", { filePath: "secret/key" })
+  await expect("blocked", "grep DENY", "grep", { pattern: "x", path: `${home}/Documents/private` })
+  await expect("blocked", "edit Guard List", "edit", { filePath: `${home}/OpenCode Guard/Guard List.txt` })
+  await expect("blocked", "tilde outside", "write", { filePath: "~/.zshrc" })
+  await expect("blocked", "patch mixed", "apply_patch", { patchText: "*** Begin Patch\n*** Add File: ok.txt\n+x\n*** Delete File: ../../Documents/private/doc\n*** End Patch" })
+  await expect("allowed", "patch inside", "apply_patch", { patchText: "*** Begin Patch\n*** Update File: a.txt\n*** Move to: b/a.txt\n@@\n-x\n+y\n*** End Patch" })
+}
+process.exit(failures ? 1 : 0)
