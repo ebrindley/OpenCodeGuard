@@ -8,7 +8,7 @@ No dependencies beyond macOS 15 or later. No admin password.
 
 ## Install
 
-1. Download `OpenCodeGuard.dmg` (or `.zip`) from `dist/` and open it.
+1. Download [`OpenCodeGuard.dmg`](https://github.com/ebrindley/OpenCodeGuard/releases/latest/download/OpenCodeGuard.dmg) (or the [`.zip`](https://github.com/ebrindley/OpenCodeGuard/releases/latest/download/OpenCodeGuard.zip)) and open it.
 2. Double-click **Install OpenCode Guard**. macOS blocks unsigned downloads the first time: open **System Settings → Privacy & Security** and click **Open Anyway**.
 3. Choose your projects folder. At the end, click **Edit List** to review your allow and deny list.
 
