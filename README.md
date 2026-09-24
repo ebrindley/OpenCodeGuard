@@ -24,19 +24,21 @@ Then start OpenCode with **OpenCode Guarded** (in `~/Applications`, drag it to t
 | `READ ONLY` | read and search only |
 | `DENY` | nothing: no reading, searching, changing or deleting |
 
-DENY always wins. Between ALLOW and READ ONLY, the more specific path wins. Skipped or refused lines are explained in `~/OpenCode Guard/last-launch.log`.
+DENY always wins. Between ALLOW and READ ONLY, the more specific path wins. Folders above a DENY or READ ONLY entry cannot be renamed or removed. `/`, your home folder, `~/Library`, `~/.config` and `~/.local` cannot be allowed as a whole.
+
+`~/OpenCode Guard/last-launch.log` shows what applied at the last launch, lines that were skipped or refused, and the locations OpenCode can always write for itself: its data and state folders, caches, npm and Bun caches, and temp folders.
 
 ## How it works
 
-- **Sandbox.** OpenCode (CLI and Desktop) runs under a macOS Seatbelt profile built from the list at each launch. Every process OpenCode starts inherits it. Writes are denied everywhere except ALLOW folders and what OpenCode itself needs (its data, caches, temp). DENY blocks reads too. The guard, the list, OpenCode's config, shell startup files and LaunchAgents are always protected. Launching apps, Apple Events via `osascript`, `launchctl` and `sudo` are blocked.
-- **Plugin.** Refuses edits and reads that the list forbids with a clear message, before the sandbox has to. If OpenCode was started without the guard, it refuses every tool except read-only ones.
-- **[cc-safety-net](https://github.com/kenryu42/claude-code-safety-net)** (bundled, MIT). Blocks destructive shell commands such as `git reset --hard`, force pushes and recursive `rm`.
+- **Sandbox.** OpenCode (CLI and Desktop) runs under a macOS Seatbelt profile built from the list at each launch. Every process OpenCode starts inherits it. Writes are denied everywhere except ALLOW folders and what OpenCode itself needs. DENY blocks reads too. Always protected, including through symlinks: the guard, the list, OpenCode's global config, any project `.opencode` folder or `opencode.json` (these load code at the next start), cc-safety-net's rules, shell startup files and LaunchAgents. Launching apps, `osascript`, `osacompile`, `codesign`, `launchctl` and `sudo` are blocked.
+- **Plugin.** Refuses edits and reads that the list forbids with a clear message, before the sandbox has to, and runs **[cc-safety-net](https://github.com/kenryu42/claude-code-safety-net)** (bundled, MIT), which blocks destructive shell commands such as `git reset --hard`, force pushes and recursive `rm`. If OpenCode was started without the guard, every tool that touches files or runs commands is refused. It registers an `opencode_guard_status` tool; the installer's self-test starts OpenCode inside the guard and checks that it is present.
 
 ## Limits
 
 - Anything inside an ALLOW folder can be deleted. Keep backups and push your git work.
+- Agents cannot edit project `.opencode` folders or `opencode.json` files; do that yourself.
 - Folder names under DENY remain visible in their parent's listing.
-- A program an agent compiles itself can still send Apple Events. Existing services outside the sandbox (for example Docker) are outside its reach.
+- A program an agent compiles itself can still send Apple Events. Existing services outside the sandbox (for example Docker, remote MCP servers) are outside its reach.
 - Opening links from the Desktop app is blocked while guarded. Sign in to providers by opening OpenCode once without the guard; tools stay disabled in that mode.
 - The Desktop app's built-in updater cannot install while guarded. Update it without the guard.
 - `opencode --pure` or a custom config directory skips the plugins; the sandbox still applies when launched through the guard.
@@ -44,11 +46,11 @@ DENY always wins. Between ALLOW and READ ONLY, the more specific path wins. Skip
 
 ## Uninstall
 
-`zsh ~/Library/Application\ Support/OpenCodeGuard/uninstall.sh` — removes everything except your list and restores OpenCode's previous permission settings.
+`zsh ~/Library/Application\ Support/OpenCodeGuard/uninstall.sh` — removes everything except your list. The installer sets `edit`, `bash` and `external_directory` to allow (keeping any finer rules); uninstall restores each one it changed unless you have changed it since.
 
 ## Development
 
-- `zsh test/test.sh` — installs into a throwaway home, checks list parsing, the sandbox and the plugin, then uninstalls. Runs outside any sandbox; plugin checks need `node`.
+- `zsh test/test.sh` — installs into a throwaway home, checks list parsing, the sandbox, the plugin and the OpenCode self-test, then uninstalls. Runs outside any sandbox; needs `node` and the `opencode` CLI.
 - `zsh build.sh` — builds `dist/OpenCodeGuard.dmg` and `dist/OpenCodeGuard.zip`.
 
 ## License
