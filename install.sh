@@ -123,13 +123,14 @@ for rc in "$home/.zprofile" "$home/.zshrc" "$home/.bash_profile"; do
 done
 say "PATH: new terminal windows run opencode inside the guard"
 
-if app=$("$engine/launch" find-app); then
+if "$engine/launch" find-app >/dev/null; then
   /bin/rm -rf "$launcher"
   /bin/mkdir -p "${launcher:h}"
   /usr/bin/osacompile -o "$launcher" -e "do shell script quoted form of \"$engine/bin/opencode-gui\" & \" >/dev/null 2>&1 &\""
   /usr/bin/plutil -replace CFBundleIdentifier -string ai.opencodeguard.launcher "$launcher/Contents/Info.plist"
-  icon=$(/usr/bin/plutil -extract CFBundleIconFile raw "$app/Contents/Info.plist" 2>/dev/null || true)
-  [[ -n $icon ]] && /bin/cp "$app/Contents/Resources/${icon%.icns}.icns" "$launcher/Contents/Resources/applet.icns" 2>/dev/null || true
+  /bin/cp "$src/assets/OpenCodeGuard.icns" "$launcher/Contents/Resources/applet.icns"
+  /bin/rm -f "$launcher/Contents/Resources/Assets.car"
+  /usr/bin/plutil -remove CFBundleIconName "$launcher/Contents/Info.plist"
   /usr/bin/codesign --force --sign - "$launcher" 2>/dev/null
   say "GUI: $launcher (drag it to the Dock)"
 else

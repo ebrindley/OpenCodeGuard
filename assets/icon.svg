@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#262b36"/>
+      <stop offset="1" stop-color="#0c0e13"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#0f9f7f"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="3"/>
+  <path d="M512 214 C606 262 690 280 760 280 L760 510 C760 668 650 776 512 830 C374 776 264 668 264 510 L264 280 C334 280 418 262 512 214 Z" fill="url(#shield)"/>
+  <path d="M512 244 C598 286 672 302 732 304 L732 380 C650 392 580 420 512 470 C444 420 374 392 292 380 L292 304 C352 302 426 286 512 244 Z" fill="url(#gloss)"/>
+  <polyline points="398,448 486,522 398,596" fill="none" stroke="#0c0e13" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="512" y="572" width="140" height="50" rx="25" fill="#0c0e13"/>
+</svg>

@@ -1,3 +1,5 @@
+<img src="assets/icon.png" width="128" alt="">
+
 # OpenCode Guard
 
 Guardrails for [OpenCode](https://opencode.ai) on macOS. Agents keep full tool permissions and broad read access, but can only change or delete files in folders you allow, can never touch folders you deny, and cannot edit the guard itself.
