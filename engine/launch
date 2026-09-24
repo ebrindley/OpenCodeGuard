@@ -67,7 +67,7 @@ normalize() {
   REPLY=${p:A}
 }
 
-within() { [[ $1 == "$2" || $1 == "$2"/* ]] }
+within() { [[ $2 == / || $1 == "$2" || $1 == "$2"/* ]] }
 
 print -r -- "OpenCode Guard $mode $(/bin/date '+%Y-%m-%d %H:%M:%S')" > "$log"
 
@@ -81,17 +81,20 @@ while IFS= read -r line || [[ -n $line ]]; do
   line=${line%%[[:space:]]##}
   [[ -z $line || $line == \#* ]] && continue
   case ${(U)line} in
-    (ALLOW*) section=allow; continue ;;
-    (READ*) section=readonly; continue ;;
-    (DENY*) section=deny; continue ;;
+    (ALLOW(|[[:space:]]#[-:]*)) section=allow; continue ;;
+    (READ([[:space:]]##|-)ONLY(|[[:space:]]#[-:]*)) section=readonly; continue ;;
+    (DENY(|[[:space:]]#[-:]*)) section=deny; continue ;;
   esac
   [[ -n $section ]] || continue
   normalize "$line" || { note "skipped, not a full path: $line"; continue }
   p=$REPLY
-  if [[ $section == deny ]]; then
+  if [[ $section != allow ]]; then
     for e in $essential; do
-      within "$e" "$p" && { note "refused DENY, OpenCode needs $e: $p"; continue 2 }
+      within "$e" "$p" && { note "refused ${${section:u}/READONLY/READ ONLY}, OpenCode needs $e: $p"; continue 2 }
     done
+  fi
+  if [[ $section == deny ]]; then
+    [[ -e $p ]] || note "warning: DENY entry does not exist, check the spelling: $p"
     deny+=("$p")
     continue
   fi
@@ -197,7 +200,8 @@ case $mode in
       ids=
       for i in {1..40}; do
         url=$(/usr/bin/grep -o 'http://127\.0\.0\.1:[0-9]*' "$out" 2>/dev/null | head -1) || true
-        [[ -n $url ]] && ids=$(/usr/bin/curl -sf "$url/experimental/tool/ids?directory=${darwin_temp// /%20}" 2>/dev/null) && break
+        [[ -n $url ]] && ids=$(/usr/bin/curl -sf --max-time 5 "$url/experimental/tool/ids?directory=${darwin_temp// /%20}" 2>/dev/null) &&
+          [[ $ids == *'"opencode_guard_status"'* ]] && break
         sleep 0.5
       done
       kill $pid 2>/dev/null || true
@@ -214,5 +218,5 @@ case $mode in
 esac
 
 unset ELECTRON_RUN_AS_NODE OPENCODE_SIDECAR_V2
-export OPENCODE_SANDBOXED=1
+export OPENCODE_SANDBOXED=1 CC_SAFETY_NET_PARANOID_RM=1
 exec $sandbox "$@"

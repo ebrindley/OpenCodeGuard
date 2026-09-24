@@ -32,17 +32,20 @@ check "zprofile without final newline kept intact" /usr/bin/grep -Fxq 'alias x=y
 check "permission merge" /usr/bin/jq -e '.permission == {"bash":{"*":"allow","git *":"allow","rm *":"deny"},"task":"ask","edit":"allow","external_directory":"allow"} and (.permission.bash | keys_unsorted[0]) == "*"' "$cfg"
 
 /usr/bin/awk -v h="$home" '
-  /^ALLOW/ { print; print h "/Projects/archive/live"; print h "/Library"; next }
-  /^READ ONLY/ { print; print h "/Projects/archive"; next }
-  /^DENY/ { print; print h "/Projects/app/secret"; print "~/Documents/private"; print h "/Library"; print "not a path"; next }
+  /^ALLOW/ { print; print h "/Projects/archive/live"; print h "/Library"; print "/"; next }
+  /^READ ONLY/ { print; print h "/Projects/archive"; print "~"; next }
+  /^DENY/ { print; print h "/Projects/app/secret"; print "Allow me to note:"; print "~/Documents/private"; print "~/Documents/typo"; print h "/Library"; print "not a path"; next }
   { print }' "$list" > "$list.tmp" && /bin/mv "$list.tmp" "$list"
 
 profile=$("$engine/launch" profile 2>/dev/null) || fail "profile"
 check "essential DENY refused" /usr/bin/grep -q "refused DENY, OpenCode needs" "$log"
 check "broad ALLOW refused" /usr/bin/grep -q "refused ALLOW, too broad: $home/Library" "$log"
+check "ALLOW / refused" /usr/bin/grep -qx "refused ALLOW, too broad: /" "$log"
+check "essential READ ONLY refused" /usr/bin/grep -q "refused READ ONLY, OpenCode needs" "$log"
+check "missing DENY warned" /usr/bin/grep -q "DENY entry does not exist, check the spelling: $home/Documents/typo" "$log"
 check "junk line skipped" /usr/bin/grep -q "skipped, not a full path: not a path" "$log"
 check "built-ins listed" /usr/bin/grep -q "always writable for OpenCode itself" "$log"
-check "rules.json" /usr/bin/jq -e --arg h "$home" '.deny == [$h + "/Projects/app/secret", $h + "/Documents/private"]' "$engine/state/rules.json"
+check "rules.json" /usr/bin/jq -e --arg h "$home" '.deny == [$h + "/Projects/app/secret", $h + "/Documents/private", $h + "/Documents/typo"]' "$engine/state/rules.json"
 
 temp=${$(/usr/bin/getconf DARWIN_USER_TEMP_DIR):A}
 cache=${$(/usr/bin/getconf DARWIN_USER_CACHE_DIR):A}
@@ -68,15 +71,18 @@ expect no "write project .opencode"       sb /bin/mkdir -p "$home/Projects/app/.
 expect no "write project opencode.json"   sb /usr/bin/touch "$home/Projects/app/opencode.json"
 expect no "exec open"                     sb /usr/bin/open -h
 expect no "exec codesign"                 sb /usr/bin/codesign -h
+expect no "exec diskutil"                 sb /usr/sbin/diskutil list
+expect no "write project .cc-safety-net"  sb /bin/mkdir -p "$home/Projects/app/.cc-safety-net"
+expect ok "write cc-safety-net logs"      sb /usr/bin/touch "$home/.cc-safety-net/logs/x"
 expect ok "write temp"                    sb /usr/bin/touch "$temp/.opencode-guard-test"
 expect no "write other per-user dirs"     sb /usr/bin/touch "${temp:h}/0/.opencode-guard-test"
 /bin/rm -f "$temp/.opencode-guard-test"
 
 /bin/mkdir -p "$home/fakebin"
-print -r -- $'#!/bin/sh\ntouch "$HOME/Documents/escaped" "$HOME/Projects/app/launched"' > "$home/fakebin/opencode"
+print -r -- $'#!/bin/sh\ntouch "$HOME/Documents/escaped"\n[ "$CC_SAFETY_NET_PARANOID_RM" = 1 ] && touch "$HOME/Projects/app/launched"' > "$home/fakebin/opencode"
 /bin/chmod 755 "$home/fakebin/opencode"
 PATH="$home/fakebin:$PATH" OPENCODE_SANDBOXED=1 "$engine/bin/opencode" >/dev/null 2>&1
-[[ -e $home/Projects/app/launched && ! -e $home/Documents/escaped ]] && pass "launch cli sandboxes despite OPENCODE_SANDBOXED" || fail "launch cli sandbox"
+[[ -e $home/Projects/app/launched && ! -e $home/Documents/escaped ]] && pass "launch cli sandboxes despite OPENCODE_SANDBOXED, paranoid rm on" || fail "launch cli sandbox"
 
 if command -v node >/dev/null; then
   plugin="$home/.config/opencode/plugins/opencode-guard.js"

@@ -34,6 +34,20 @@ for t in /usr/bin/sandbox-exec /usr/bin/jq /usr/bin/osacompile /usr/bin/codesign
   [[ -x $t ]] || die "missing $t (macOS 15 or later required)"
 done
 
+if [[ -z $projects && $gui == 0 && -t 0 ]]; then
+  print -n "Drag your projects folder here and press Return (Return alone skips): "
+  read -r projects
+fi
+projects=${${projects##[[:space:]]##}%%[[:space:]]##}
+if [[ -n $projects ]]; then
+  [[ -e $projects ]] || projects=${(Q)projects}
+  [[ -d $projects ]] || die "not a folder: $projects"
+  projects=${projects:A}
+  for s in "$home/Library/Application Support" "$home/.config" "$home/.local"; do
+    [[ $projects == / || $s == "$projects" || $s == "$projects"/* ]] && die "$projects is too broad to allow; choose the folder that holds your projects"
+  done
+fi
+
 typeset -a configs
 for f in "$conf/config.json" "$conf/opencode.json" "$conf/opencode.jsonc"; do
   [[ -e $f ]] || continue
@@ -58,15 +72,7 @@ say "engine: $engine"
 
 /bin/mkdir -p "$list_dir"
 [[ -e $list ]] || /bin/cp "$src/templates/Guard List.txt" "$list"
-if [[ -z $projects && $gui == 0 && -t 0 ]]; then
-  print -n "Drag your projects folder here and press Return (Return alone skips): "
-  read -r projects
-fi
-projects=${${projects##[[:space:]]##}%%[[:space:]]##}
 if [[ -n $projects ]]; then
-  [[ -e $projects ]] || projects=${(Q)projects}
-  [[ -d $projects ]] || die "not a folder: $projects"
-  projects=${projects:A}
   if ! /usr/bin/grep -Fxq -- "$projects" "$list"; then
     /usr/bin/awk -v p="$projects" '{ print } !done && toupper($0) ~ /^ALLOW/ { print p; done = 1 }' "$list" > "$list.tmp"
     /bin/mv -f "$list.tmp" "$list"
@@ -123,22 +129,24 @@ for rc in "$home/.zprofile" "$home/.zshrc" "$home/.bash_profile"; do
 done
 say "PATH: new terminal windows run opencode inside the guard"
 
-if "$engine/launch" find-app >/dev/null; then
-  /bin/rm -rf "$launcher"
-  /bin/mkdir -p "${launcher:h}"
-  /usr/bin/osacompile -o "$launcher" -e "do shell script quoted form of \"$engine/bin/opencode-gui\" & \" >/dev/null 2>&1 &\""
-  /usr/bin/plutil -replace CFBundleIdentifier -string ai.opencodeguard.launcher "$launcher/Contents/Info.plist"
-  /bin/cp "$src/assets/OpenCodeGuard.icns" "$launcher/Contents/Resources/applet.icns"
-  /bin/rm -f "$launcher/Contents/Resources/Assets.car"
-  /usr/bin/plutil -remove CFBundleIconName "$launcher/Contents/Info.plist"
-  /usr/bin/codesign --force --sign - "$launcher" 2>/dev/null
-  say "GUI: $launcher (drag it to the Dock)"
-else
-  say "GUI: OpenCode.app not found; rerun the installer after installing it"
-fi
+/bin/rm -rf "$launcher"
+/bin/mkdir -p "${launcher:h}"
+/usr/bin/osacompile -o "$launcher" -e "do shell script quoted form of \"$engine/bin/opencode-gui\" & \" >/dev/null 2>&1 &\""
+/usr/bin/plutil -replace CFBundleIdentifier -string ai.opencodeguard.launcher "$launcher/Contents/Info.plist"
+/bin/cp "$src/assets/OpenCodeGuard.icns" "$launcher/Contents/Resources/applet.icns"
+/bin/rm -f "$launcher/Contents/Resources/Assets.car"
+/usr/bin/plutil -remove CFBundleIconName "$launcher/Contents/Info.plist"
+/usr/bin/codesign --force --sign - "$launcher" 2>/dev/null
+say "GUI: $launcher (drag it to the Dock)"
+"$engine/launch" find-app >/dev/null || warnings+=("OpenCode.app not found: install it, then open OpenCode Guard")
 
 say "self-test:"
-"$engine/launch" check || die "self-test failed"
+if ! out=$("$engine/launch" check 2>&1); then
+  failed=(${(M)${(f)out}:#FAIL*})
+  (( $#failed )) || failed=("$out")
+  warnings+=("self-test failed, the guard may not work: ${(j:; :)failed}")
+fi
+say "$out"
 
 for w in $warnings; do say "warning: $w"; done
 if [[ $gui == 1 || -t 1 ]]; then

@@ -10,7 +10,7 @@ const STATE = join(ENGINE, "state")
 const LIST = "~/OpenCode Guard/Guard List.txt"
 const SAFE_UNGUARDED = new Set(["invalid", "question", "todowrite", "webfetch", "websearch", "plan_exit", "opencode_guard_status"])
 const READS = new Set(["read", "glob", "grep", "lsp"])
-const CONFIG = /\/\.opencode(\/|$)|\/opencode\.jsonc?$/
+const CONFIG = /\/\.opencode(\/|$)|\/opencode\.jsonc?$|\/\.cc-safety-net(\/|$)/
 
 const under = (p, root) => p === root || p.startsWith(root === "/" ? "/" : root + "/")
 

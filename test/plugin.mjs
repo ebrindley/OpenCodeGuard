@@ -36,6 +36,7 @@ if (mode === "unguarded" || mode === "symlinked") {
   await expect("blocked", "edit Guard List", "edit", { filePath: `${home}/OpenCode Guard/Guard List.txt` })
   await expect("blocked", "project plugin", "write", { filePath: ".opencode/plugins/x.js" })
   await expect("blocked", "project config", "edit", { filePath: "opencode.json" })
+  await expect("blocked", "project cc-safety-net policy", "write", { filePath: ".cc-safety-net/policy.json" })
   await expect("blocked", "tilde outside", "write", { filePath: "~/.zshrc" })
   await expect("blocked", "patch mixed", "apply_patch", { patchText: "*** Begin Patch\n*** Add File: ok.txt\n+x\n*** Delete File: ../../Documents/private/doc\n*** End Patch" })
   await expect("allowed", "patch inside", "apply_patch", { patchText: "*** Begin Patch\n*** Update File: a.txt\n*** Move to: b/a.txt\n@@\n-x\n+y\n*** End Patch" })
