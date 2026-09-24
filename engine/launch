@@ -1,0 +1,166 @@
+#!/bin/zsh
+# usage: launch cli|gui|profile|check [args...]
+emulate -L zsh
+setopt err_exit no_unset pipe_fail extended_glob
+
+mode=${1:-}
+(( $# )) && shift
+
+home=${HOME:A}
+engine="$home/Library/Application Support/OpenCodeGuard"
+bin="$engine/bin"
+list_dir="$home/OpenCode Guard"
+list="$list_dir/Guard List.txt"
+log="$list_dir/last-launch.log"
+here=${0:A:h}
+
+fail() {
+  print -ru2 -- "opencode-guard: $*"
+  if [[ $mode == gui ]]; then
+    /usr/bin/osascript -e 'on run argv' -e 'display alert "OpenCode Guard" message (item 1 of argv) as critical' -e 'end run' "$*" >/dev/null 2>&1 || true
+  fi
+  exit 1
+}
+
+note() {
+  print -r -- "$*" >> "$log"
+  [[ $mode == gui ]] || print -ru2 -- "opencode-guard: $*"
+}
+
+next_opencode() {
+  local d f
+  for d in $path; do
+    f="$d/opencode"
+    [[ -x $f && ! -d $f && ${f:A} != "${bin:A}/opencode" ]] || continue
+    REPLY=$f
+    return 0
+  done
+  for f in /opt/homebrew/bin/opencode /usr/local/bin/opencode "$home/.opencode/bin/opencode"; do
+    [[ -x $f ]] && { REPLY=$f; return 0 }
+  done
+  return 1
+}
+
+find_app() {
+  local a
+  for a in /Applications/OpenCode.app "$home/Applications/OpenCode.app" \
+           ${(f)"$(/usr/bin/mdfind "kMDItemCFBundleIdentifier == 'ai.opencode.desktop'" 2>/dev/null)"}; do
+    [[ -d $a/Contents/MacOS ]] && { REPLY=$a; return 0 }
+  done
+  return 1
+}
+
+if [[ $mode == cli && ${OPENCODE_SANDBOXED:-} == 1 ]]; then
+  next_opencode || fail "opencode not found"
+  exec "$REPLY" "$@"
+fi
+[[ ${OPENCODE_SANDBOXED:-} != 1 ]] || fail "already inside the guard"
+[[ -r $list ]] || fail "cannot read $list"
+
+normalize() {
+  local p=$1
+  [[ $p == (\"*\"|\'*\') ]] && p=${p[2,-2]}
+  [[ -e $p || $p != *\\* ]] || p=${(Q)p}
+  [[ $p == '~' || $p == '~/'* ]] && p=$home${p#\~}
+  [[ $p == /* ]] || return 1
+  REPLY=${p:A}
+}
+
+print -r -- "OpenCode Guard $mode $(/bin/date '+%Y-%m-%d %H:%M:%S')" > "$log"
+
+essential=(/ $home $home/Library $home/.config $home/.local $home/.cache
+           /usr /bin /sbin /System /Library /private /dev /opt /Applications)
+typeset -a allow readonly deny scoped
+section=
+while IFS= read -r line || [[ -n $line ]]; do
+  line=${${line%$'\r'}##[[:space:]]##}
+  line=${line%%[[:space:]]##}
+  [[ -z $line || $line == \#* ]] && continue
+  case ${(U)line} in
+    (ALLOW*) section=allow; continue ;;
+    (READ*) section=readonly; continue ;;
+    (DENY*) section=deny; continue ;;
+  esac
+  [[ -n $section ]] || continue
+  normalize "$line" || { note "skipped, not a full path: $line"; continue }
+  p=$REPLY
+  if [[ $section == deny ]]; then
+    for e in $essential; do
+      [[ $e == "$p" || $e == "$p"/* ]] && { note "refused DENY, OpenCode needs $e: $p"; continue 2 }
+    done
+    deny+=("$p")
+    continue
+  fi
+  [[ -e $p ]] || { note "skipped, does not exist: $p"; continue }
+  [[ $section == allow && ( $p == / || $p == "$home" ) ]] && { note "refused ALLOW, too broad: $p"; continue }
+  if [[ $section == allow ]]; then allow+=("$p"); else readonly+=("$p"); fi
+  scoped+=("${(l:3::0:)${#${p//[^\/]/}}}"$'\t'"$section"$'\t'"$p")
+done < "$list"
+
+sbpl() { local s=${1//\\/\\\\}; REPLY="\"${s//\"/\\\"}\"" }
+typeset -a rules
+for entry in ${(o)scoped}; do
+  kind=${${entry#*$'\t'}%%$'\t'*}
+  p=${entry##*$'\t'}
+  sbpl "$p"
+  if [[ $kind == allow ]]; then
+    rules+=("(allow file-write* (subpath $REPLY))")
+    [[ -d $p ]] && rules+=("(deny file-write* (literal $REPLY))")
+  else
+    rules+=("(deny file-write* (subpath $REPLY))")
+  fi
+done
+for p in $deny; do
+  sbpl "$p"
+  rules+=("(deny file-read* file-write* (subpath $REPLY))")
+  for s in $allow $readonly; do
+    [[ $s == "$p" || $s == "$p"/* ]] && note "overridden by DENY $p: $s"
+  done
+done
+note "allow: ${(j:, :)allow:-none}"
+note "read only: ${(j:, :)readonly:-none}"
+note "deny: ${(j:, :)deny:-none}"
+
+profile=$(<"$here/profile.sb")
+profile=${profile/';;@USER_RULES@'/${(F)rules}}
+darwin_user=$(cd "$(/usr/bin/getconf DARWIN_USER_TEMP_DIR)/.." && pwd -P)
+
+jarr() { /usr/bin/jq -cn '$ARGS.positional' --args "$@" }
+/bin/mkdir -p "$engine/state"
+print -r -- "{\"allow\":$(jarr $allow),\"readonly\":$(jarr $readonly),\"deny\":$(jarr $deny)}" > "$engine/state/rules.json.$$"
+/bin/mv -f "$engine/state/rules.json.$$" "$engine/state/rules.json"
+
+sandbox=(/usr/bin/sandbox-exec -D "HOME=$home" -D "DARWIN_USER=$darwin_user" -p "$profile")
+
+case $mode in
+  (cli)
+    next_opencode || fail "opencode not found"
+    set -- -D GUI=0 "$REPLY" "$@"
+    ;;
+  (gui)
+    find_app || fail "OpenCode.app not found"
+    app=$REPLY
+    main=$(/usr/bin/plutil -extract CFBundleExecutable raw "$app/Contents/Info.plist")
+    /usr/bin/pgrep -x "$main" >/dev/null && fail "OpenCode is already running. Quit it, then open OpenCode Guarded."
+    set -- -D GUI=1 "$app/Contents/MacOS/$main" --no-sandbox "$@"
+    ;;
+  (profile)
+    print -r -- "$profile"
+    exit 0
+    ;;
+  (check)
+    probe="$engine/state/.check" tmp="$darwin_user/T/.opencode-guard-check" ok=1
+    $sandbox -D GUI=0 /usr/bin/touch "$probe" 2>/dev/null && { print "FAIL protected write allowed"; ok=0 } || print "ok   protected write denied"
+    $sandbox -D GUI=0 /usr/bin/touch "$tmp" && print "ok   temp write allowed" || { print "FAIL temp write denied"; ok=0 }
+    $sandbox -D GUI=0 /usr/bin/open -h >/dev/null 2>&1 || rc=$?
+    (( ${rc:-0} == 71 )) && print "ok   open denied" || { print "FAIL open allowed"; ok=0 }
+    /bin/rm -f "$probe" "$tmp"
+    (( ok ))
+    exit
+    ;;
+  (*) fail "usage: launch cli|gui|profile|check" ;;
+esac
+
+unset ELECTRON_RUN_AS_NODE OPENCODE_SIDECAR_V2
+export OPENCODE_SANDBOXED=1
+exec $sandbox "$@"
