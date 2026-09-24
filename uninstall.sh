@@ -37,7 +37,7 @@ if [[ -e $record ]]; then
 fi
 
 /bin/rm -f "$home/.config/opencode/plugins/opencode-guard.js"
-/bin/rm -rf "$home/Applications/OpenCode Guarded.app" "$cc/opencode-guard"
+/bin/rm -rf "$home/Applications/OpenCode Guard.app" "$cc/opencode-guard"
 if [[ -e $cc/rule.json ]]; then
   if /usr/bin/jq '.rules -= ["opencode-guard"]' "$cc/rule.json" > "$cc/rule.json.tmp" 2>/dev/null; then
     /bin/mv -f "$cc/rule.json.tmp" "$cc/rule.json"

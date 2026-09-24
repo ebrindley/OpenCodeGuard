@@ -12,7 +12,7 @@ No dependencies beyond macOS 15 or later. No admin password.
 
 From a terminal: `zsh install.sh` in a clone of this repository.
 
-Then start OpenCode with **OpenCode Guarded** (in `~/Applications`, drag it to the Dock) or type `opencode` in a new terminal window.
+Then start OpenCode with **OpenCode Guard** (in `~/Applications`, drag it to the Dock) or type `opencode` in a new terminal window.
 
 ## The list
 

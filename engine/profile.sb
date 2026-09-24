@@ -36,7 +36,7 @@
   (subpath (h "/.cc-safety-net/rules"))
   (literal (h "/.cc-safety-net/policy.json"))
   (subpath (h "/Library/LaunchAgents"))
-  (subpath (h "/Applications/OpenCode Guarded.app"))
+  (subpath (h "/Applications/OpenCode Guard.app"))
   (literal (h "/.zshenv"))
   (literal (h "/.zprofile"))
   (literal (h "/.zshrc"))

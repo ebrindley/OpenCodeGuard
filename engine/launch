@@ -176,7 +176,7 @@ case $mode in
     find_app || fail "OpenCode.app not found"
     app=$REPLY
     main=$(/usr/bin/plutil -extract CFBundleExecutable raw "$app/Contents/Info.plist")
-    /usr/bin/pgrep -x "$main" >/dev/null && fail "OpenCode is already running. Quit it, then open OpenCode Guarded."
+    /usr/bin/pgrep -x "$main" >/dev/null && fail "OpenCode is already running. Quit it, then open OpenCode Guard."
     set -- -D GUI=1 "$app/Contents/MacOS/$main" --no-sandbox "$@"
     ;;
   (profile)

@@ -10,7 +10,7 @@ state="$engine/state"
 list_dir="$home/OpenCode Guard"
 list="$list_dir/Guard List.txt"
 conf="$home/.config/opencode"
-launcher="$home/Applications/OpenCode Guarded.app"
+launcher="$home/Applications/OpenCode Guard.app"
 cc="$home/.cc-safety-net/rules"
 marker_start='# >>> opencode-guard >>>'
 marker_end='# <<< opencode-guard <<<'
@@ -141,7 +141,7 @@ say "self-test:"
 
 for w in $warnings; do say "warning: $w"; done
 if [[ $gui == 1 || -t 1 ]]; then
-  msg=$'OpenCode Guard is installed.\n\nOpen OpenCode with OpenCode Guarded, or type opencode in a new terminal window.'
+  msg=$'OpenCode Guard is installed.\n\nOpen OpenCode with OpenCode Guard, or type opencode in a new terminal window.'
   (( $#warnings )) && msg+=$'\n\n'"${(pj:\n:)warnings}"
   answer=$(/usr/bin/osascript -e 'on run argv' -e 'button returned of (display dialog (item 1 of argv) & return & return & "Edit the allow and deny list now?" buttons {"Later", "Edit List"} default button "Edit List" with title "OpenCode Guard")' -e 'end run' "$msg" 2>/dev/null || true)
   [[ $answer == "Edit List" ]] && /usr/bin/open -e "$list"

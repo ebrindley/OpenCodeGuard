@@ -108,7 +108,7 @@ export const OpenCodeGuard = async input => {
     const args = output.args ?? {}
     if (!guarded) {
       if (!bypass && !SAFE_UNGUARDED.has(tool))
-        throw new Error("OpenCode Guard: OpenCode was started without the guard. Quit it and open OpenCode Guarded, or run opencode from a new terminal.")
+        throw new Error("OpenCode Guard: OpenCode was started without the guard. Quit it and open OpenCode Guard, or run opencode from a new terminal.")
       return net?.["tool.execute.before"]?.(info, output)
     }
     if (!net) throw new Error("OpenCode Guard: cc-safety-net failed to load; reinstall OpenCode Guard.")
