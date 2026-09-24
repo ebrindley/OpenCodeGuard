@@ -1,16 +1,16 @@
-import { closeSync, lstatSync, openSync, readFileSync, realpathSync, unlinkSync } from "node:fs"
+import { closeSync, constants, lstatSync, openSync, readFileSync, realpathSync, unlinkSync } from "node:fs"
 import { basename, dirname, join, resolve } from "node:path"
 import { homedir, tmpdir } from "node:os"
+import { randomBytes } from "node:crypto"
+import { pathToFileURL } from "node:url"
 
 const HOME = realpathSync(homedir())
 const ENGINE = join(HOME, "Library/Application Support/OpenCodeGuard")
+const STATE = join(ENGINE, "state")
 const LIST = "~/OpenCode Guard/Guard List.txt"
-const PROTECTED = [ENGINE, join(HOME, "OpenCode Guard"), join(HOME, ".config/opencode"), join(HOME, ".cc-safety-net")]
-const SAFE_UNGUARDED = new Set([
-  "read", "glob", "grep", "list", "webfetch", "websearch", "codesearch", "todoread", "todowrite",
-  "question", "skill", "task", "lsp", "invalid", "plan_enter", "plan_exit",
-])
-const READS = new Set(["read", "glob", "grep", "list"])
+const SAFE_UNGUARDED = new Set(["invalid", "question", "todowrite", "webfetch", "websearch", "plan_exit", "opencode_guard_status"])
+const READS = new Set(["read", "glob", "grep", "lsp"])
+const CONFIG = /\/\.opencode(\/|$)|\/opencode\.jsonc?$/
 
 const under = (p, root) => p === root || p.startsWith(root === "/" ? "/" : root + "/")
 
@@ -28,10 +28,15 @@ function canonical(p) {
   }
 }
 
-function guarded() {
-  const probe = join(ENGINE, "state", `.probe-${process.pid}`)
+function sandboxed() {
   try {
-    closeSync(openSync(probe, "w"))
+    if (lstatSync(STATE).isSymbolicLink()) return false
+  } catch {
+    return false
+  }
+  const probe = join(STATE, `.probe-${process.pid}-${randomBytes(6).toString("hex")}`)
+  try {
+    closeSync(openSync(probe, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW))
     unlinkSync(probe)
     return false
   } catch (error) {
@@ -41,7 +46,16 @@ function guarded() {
 
 function loadRules() {
   try {
-    return JSON.parse(readFileSync(join(ENGINE, "state/rules.json"), "utf8"))
+    return JSON.parse(readFileSync(join(STATE, "rules.json"), "utf8"))
+  } catch {
+    return null
+  }
+}
+
+async function loadSafetyNet(input) {
+  try {
+    const url = pathToFileURL(join(ENGINE, "vendor/cc-safety-net/dist/index.js")).href
+    return await (await import(url)).default.server(input)
   } catch {
     return null
   }
@@ -52,11 +66,15 @@ function patchPaths(text) {
   return [...text.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to):(.*)$/gm)].map(m => m[1].trim())
 }
 
-export const OpenCodeGuard = async ({ directory }) => {
-  const sandboxed = guarded()
+export const OpenCodeGuard = async input => {
+  const { directory } = input
+  const guarded = sandboxed()
   const bypass = process.env.OPENCODE_GUARD_BYPASS === "1"
   const rules = loadRules()
+  const net = await loadSafetyNet(input)
   const temps = [...new Set([canonical(tmpdir()), "/private/tmp"])]
+  const protectedRoots = [ENGINE, join(HOME, "OpenCode Guard"), join(HOME, ".config/opencode"), join(HOME, ".cc-safety-net")]
+    .map(p => { try { return realpathSync(p) } catch { return p } })
 
   const target = raw => {
     if (typeof raw !== "string" || !raw || raw.includes("\0")) throw new Error("OpenCode Guard: invalid path")
@@ -72,14 +90,12 @@ export const OpenCodeGuard = async ({ directory }) => {
   }
 
   const checkRead = raw => {
-    if (!rules) return
-    const p = target(raw)
-    if (scope(p) === "deny") throw new Error(`OpenCode Guard: ${p} is in the DENY list (${LIST}).`)
+    if (rules && scope(target(raw)) === "deny") throw new Error(`OpenCode Guard: ${raw} is in the DENY list (${LIST}).`)
   }
 
   const checkWrite = raw => {
     const p = target(raw)
-    if (PROTECTED.some(r => under(p, r))) throw new Error(`OpenCode Guard: ${p} is protected.`)
+    if (protectedRoots.some(r => under(p, r)) || CONFIG.test(p)) throw new Error(`OpenCode Guard: ${p} is protected.`)
     if (!rules) throw new Error("OpenCode Guard: rules unavailable; relaunch OpenCode.")
     const kind = scope(p)
     if (kind === "deny") throw new Error(`OpenCode Guard: ${p} is in the DENY list (${LIST}).`)
@@ -87,18 +103,36 @@ export const OpenCodeGuard = async ({ directory }) => {
     throw new Error(`OpenCode Guard: ${p} is not writable. Add it under ALLOW in ${LIST}, then relaunch.`)
   }
 
-  return {
-    "tool.execute.before": async ({ tool }, { args = {} }) => {
-      if (!sandboxed && bypass) return
-      if (!sandboxed && !SAFE_UNGUARDED.has(tool))
+  const before = async (info, output) => {
+    const { tool } = info
+    const args = output.args ?? {}
+    if (!guarded) {
+      if (!bypass && !SAFE_UNGUARDED.has(tool))
         throw new Error("OpenCode Guard: OpenCode was started without the guard. Quit it and open OpenCode Guarded, or run opencode from a new terminal.")
-      if (READS.has(tool)) return checkRead(args.filePath ?? args.path ?? directory)
-      if (tool === "edit" || tool === "write") return checkWrite(args.filePath)
-      if (tool === "apply_patch") {
-        const paths = patchPaths(args.patchText)
-        if (!paths.length) throw new Error("OpenCode Guard: no file paths in patch")
-        paths.forEach(checkWrite)
-      }
+      return net?.["tool.execute.before"]?.(info, output)
+    }
+    if (!net) throw new Error("OpenCode Guard: cc-safety-net failed to load; reinstall OpenCode Guard.")
+    if (READS.has(tool)) checkRead(args.filePath ?? args.path ?? directory)
+    if (tool === "edit" || tool === "write") checkWrite(args.filePath)
+    if (tool === "apply_patch") {
+      const paths = patchPaths(args.patchText)
+      if (!paths.length) throw new Error("OpenCode Guard: no file paths in patch")
+      paths.forEach(checkWrite)
+    }
+    await net["tool.execute.before"]?.(info, output)
+  }
+
+  const status = {
+    description: "Report whether OpenCode Guard is active.",
+    args: {},
+    async execute() {
+      return guarded ? "OpenCode Guard is active." : "OpenCode Guard is NOT active: OpenCode was started without the guard."
     },
+  }
+
+  return {
+    ...(net ?? {}),
+    ...(net ? { tool: { ...(net.tool ?? {}), opencode_guard_status: status } } : {}),
+    "tool.execute.before": before,
   }
 }
