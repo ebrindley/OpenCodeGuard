@@ -14,3 +14,7 @@ ALLOW - agents may create, change and delete things inside these:
 READ ONLY - agents may look but never change or delete:
 
 DENY - agents may not read, search, change or delete these:
+# Examples; remove the # to use. Denying these breaks git over SSH and cloud tools inside the guard.
+# ~/.ssh
+# ~/.aws
+# ~/.gnupg

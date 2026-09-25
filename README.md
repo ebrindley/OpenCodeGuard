@@ -32,25 +32,28 @@ DENY always wins. Between ALLOW and READ ONLY, the more specific path wins. Fold
 
 ## How it works
 
-- **Sandbox.** OpenCode (CLI and Desktop) runs under a macOS Seatbelt profile built from the list at each launch. Every process OpenCode starts inherits it. Writes are denied everywhere except ALLOW folders and what OpenCode itself needs. DENY blocks reads too. Always protected, including through symlinks: the guard, the list, OpenCode's global config, any project `.opencode` folder or `opencode.json` (these load code at the next start), any `.cc-safety-net` settings, shell startup files and LaunchAgents. Launching apps, `osascript`, `osacompile`, `codesign`, `launchctl`, `diskutil` and `sudo` are blocked.
-- **Plugin.** Refuses edits and reads that the list forbids with a clear message, before the sandbox has to, and runs **[cc-safety-net](https://github.com/kenryu42/claude-code-safety-net)** (bundled, MIT), which blocks common destructive shell commands such as `git reset --hard`, force pushes and recursive `rm` (`rm -rf` also inside `bash -c`). It catches careless commands, not deliberate workarounds such as a Python script that deletes a folder. If OpenCode was started without the guard, every tool that touches files or runs commands is refused. It registers an `opencode_guard_status` tool; the installer's self-test starts OpenCode inside the guard and checks that it is present.
+- **Sandbox.** OpenCode (CLI and Desktop) runs under a macOS Seatbelt profile built from the list at each launch. Every process OpenCode starts inherits it. Writes are denied everywhere except ALLOW folders and what OpenCode itself needs. DENY blocks reads too. Always protected, including through symlinks: the guard, the list, OpenCode's global config, any `.cc-safety-net` settings, shell startup files and LaunchAgents. Also protected: any project `.opencode` folder, `opencode.json` or `tui.json` (these load code at the next start). If one of these is a symlink, its target is protected only when OpenCode is started from that project in a terminal; otherwise only the name is, and the plugin refuses edits through it. Launching apps, `osascript`, `osacompile`, `codesign`, `launchctl`, `diskutil` and `sudo` are blocked.
+- **Plugin.** Refuses edits and reads that the list forbids with a clear message, before the sandbox has to, and runs **[cc-safety-net](https://github.com/kenryu42/claude-code-safety-net)** (bundled, MIT), which blocks common destructive shell commands such as `git reset --hard`, force pushes and recursive `rm` (`rm -rf` also inside `bash -c`, but not `rm -r` without `-f` there). It catches careless commands, not deliberate workarounds such as a Python script that deletes a folder. If OpenCode was started without the guard, every tool that touches files or runs commands is refused. It registers an `opencode_guard_status` tool; the installer's self-test starts OpenCode inside the guard and checks that it is present.
 
 ## Limits
 
 - Anything inside an ALLOW folder can be deleted. Keep backups and push your git work.
-- Anything inside an ALLOW folder can also be changed, including git hooks and build scripts that run later when you use that project outside the guard.
-- Agents cannot edit project `.opencode` folders or `opencode.json` files; do that yourself.
+- Anything inside an ALLOW folder can also be changed, including git hooks and build scripts that run later when you use that project outside the guard, and dotfiles symlinked into it (for example a `~/.gitconfig` kept in a dotfiles repo), except the shell startup files.
+- Agents cannot edit project `.opencode` folders or `opencode.json` and `tui.json` files; do that yourself.
+- Reads are broad by default, including credential folders such as `~/.ssh` and `~/.aws`. Add them under DENY if agents do not need them; git over SSH and cloud CLIs then fail inside the guard. Agents can also read OpenCode's own sign-in file (`~/.local/share/opencode/auth.json`), which cannot be denied because OpenCode needs it.
 - Folder names under DENY remain visible in their parent's listing.
-- A program an agent compiles itself can still send Apple Events. Existing services outside the sandbox (for example Docker, remote MCP servers) are outside its reach.
-- Opening links from the Desktop app is blocked while guarded. Sign in to providers by opening OpenCode without the guard; tools stay disabled in that mode. Do this only when needed: plugins and tools OpenCode keeps in its cache also run then.
+- A program an agent compiles itself can still send Apple Events. Blocked programs such as `open` and `osascript` are blocked by path; a copy elsewhere is not. Existing services outside the sandbox (for example Docker, remote MCP servers) are outside its reach.
+- Opening links from the Desktop app is blocked while guarded. Sign in to providers by opening OpenCode without the guard, from a folder that is not a project; tools stay disabled in that mode. Do this only when needed: plugins and tools OpenCode keeps in its cache, and project plugins and MCP servers in the current folder, also run then.
+- The Desktop app runs with Chromium's own sandbox off (`--no-sandbox`) because it cannot nest inside the guard's sandbox; the guard's sandbox still applies.
 - Build tools that keep their own folders in your home (for example `~/.cargo`, `~/go`, `~/Library/pnpm`) fail with "Operation not permitted" until you add those folders under ALLOW.
 - The Desktop app's built-in updater cannot install while guarded. Update it without the guard.
-- `opencode --pure` or a custom config directory skips the plugins; the sandbox still applies when launched through the guard.
+- The `opencode` terminal wrapper is added to zsh startup files and, if it exists, `~/.bash_profile` only. Other shells, such as fish, start OpenCode unguarded, where the plugin refuses tools.
+- The installer sets `edit`, `bash` and `external_directory` to allow in OpenCode's global config on purpose, so runs outside the guard depend on the plugin to refuse tools. `opencode --pure` or a custom config directory skips the plugins; the sandbox still applies when launched through the guard.
 - Automation that runs OpenCode outside the guard on purpose can set `OPENCODE_GUARD_BYPASS=1`.
 
 ## Uninstall
 
-`zsh ~/Library/Application\ Support/OpenCodeGuard/uninstall.sh` — removes everything except your list. The installer sets `edit`, `bash` and `external_directory` to allow (keeping any finer rules); uninstall restores each one it changed unless you have changed it since.
+`zsh ~/Library/Application\ Support/OpenCodeGuard/uninstall.sh` — removes the guard but leaves your list, the OpenCode config file and `.gitignore` it created, and cc-safety-net logs. The installer sets `edit`, `bash` and `external_directory` to allow (keeping any finer rules); uninstall restores each one it changed unless you have changed it since. If restoring fails, it keeps a copy of the saved values in `~/OpenCode Guard/`.
 
 ## Development
 
