@@ -20,18 +20,19 @@ for rc in "$home/.zprofile" "$home/.zshrc" "$home/.bash_profile"; do
   fi
 done
 
+failed=0
 if [[ -e $record ]]; then
-  for f in ${(f)"$(/usr/bin/jq -r 'keys[]' "$record")"}; do
+  keys=$(/usr/bin/jq -r 'keys[]' "$record") || { failed=1; keys=; warn "permission record unreadable" }
+  for f in ${(f)keys}; do
     [[ -e $f ]] || continue
-    if /usr/bin/jq --slurpfile r "$record" --arg f "$f" '
+    if ! /usr/bin/jq --slurpfile r "$record" --arg f "$f" '
         reduce ($r[0][$f] | to_entries[]) as $e (.;
           if .permission[$e.key] == $e.value.wrote then
             (if $e.value.orig == null then del(.permission[$e.key]) else .permission[$e.key] = $e.value.orig end)
-          else . end)' "$f" > "$f.tmp" 2>/dev/null; then
-      /bin/mv -f "$f.tmp" "$f"
-    else
+          else . end)' "$f" > "$f.tmp" 2>/dev/null || ! /bin/mv -f "$f.tmp" "$f"; then
       /bin/rm -f "$f.tmp"
       warn "${f:t} not restored; check its permission settings"
+      failed=1
     fi
   done
 fi
@@ -47,5 +48,10 @@ if [[ -e $cc/rule.json ]]; then
   fi
 fi
 
+if (( failed )); then
+  backup="$home/OpenCode Guard/permissions-backup.json"
+  /bin/mkdir -p "${backup:h}" && /bin/cp "$record" "$backup" || { warn "could not save $record; engine kept"; exit 1 }
+  warn "original permission settings saved to $backup"
+fi
 /bin/rm -rf "$engine"
 print -r -- "OpenCode Guard removed. Your list is still at $home/OpenCode Guard."

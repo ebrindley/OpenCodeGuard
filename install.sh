@@ -73,12 +73,25 @@ say "engine: $engine"
 /bin/mkdir -p "$list_dir"
 [[ -e $list ]] || /bin/cp "$src/templates/Guard List.txt" "$list"
 if [[ -n $projects ]]; then
-  if ! /usr/bin/grep -Fxq -- "$projects" "$list"; then
-    /usr/bin/awk -v p="$projects" '{ print } !done && toupper($0) ~ /^ALLOW/ { print p; done = 1 }' "$list" > "$list.tmp"
+  listed=$(P=$projects O=$list.tmp H=$home /usr/bin/awk '
+    { print > ENVIRON["O"]; t = $0; sub(/\r$/, "", t); gsub(/^[[:space:]]+|[[:space:]]+$/, "", t); u = toupper(t)
+      if (t ~ /^~(\/|$)/) t = ENVIRON["H"] substr(t, 2); if (t ~ /.\/+$/) sub(/\/+$/, "", t) }
+    u ~ /^#/ { next }
+    u ~ /^ALLOW([[:space:]]*[-:].*)?$/ { s = "ALLOW"; if (!done) print ENVIRON["P"] > ENVIRON["O"]; done = 1; next }
+    u ~ /^READ([[:space:]]+|-)ONLY([[:space:]]*[-:].*)?$/ { s = "READ ONLY"; next }
+    u ~ /^DENY([[:space:]]*[-:].*)?$/ { s = "DENY"; next }
+    s != "" && t == ENVIRON["P"] { f[s] = 1 }
+    END { print f["DENY"] ? "DENY" : f["READ ONLY"] ? "READ ONLY" : f["ALLOW"] ? "ALLOW" : done ? "added" : "" }' "$list")
+  if [[ $listed == added ]]; then
     /bin/mv -f "$list.tmp" "$list"
+  else
+    /bin/rm -f "$list.tmp"
   fi
-  /usr/bin/grep -Fxq -- "$projects" "$list" || die "no ALLOW heading in $list; add $projects under ALLOW yourself"
-  say "allowed: $projects"
+  case $listed in
+    (ALLOW|added) say "allowed: $projects" ;;
+    ('') die "no ALLOW heading in $list; add $projects under ALLOW yourself" ;;
+    (*) warnings+=("$projects is listed under $listed in the list, so it is not writable; move it under ALLOW") ;;
+  esac
 fi
 say "list: $list"
 
