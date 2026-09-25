@@ -21,6 +21,11 @@ expect() { local want=$1 name=$2; shift 2; "$@" >/dev/null 2>&1; local rc=$?; if
 
 print 'export X=1' > "$home/Projects/dotfiles/zshrc"
 /bin/ln -s "$home/Projects/dotfiles/zshrc" "$home/.zshrc"
+print 'export Y=1' > "$home/Projects/dotfiles/bash_login"
+/bin/ln -s "$home/Projects/dotfiles/bash_login" "$home/.bash_login"
+print '{}' > "$home/Projects/dotfiles/oc.json"
+/bin/ln -s "$home/Projects/dotfiles/oc.json" "$home/Projects/app/opencode.json"
+/bin/mkdir -p "$home/Projects/archive/.opencode"
 print -n 'alias x=y' > "$home/.zprofile"
 original='{"model":"m","permission":{"bash":{"git *":"allow","*":"ask","rm *":"deny"},"task":"ask"}}'
 print -r -- "$original" > "$cfg"
@@ -37,7 +42,7 @@ check "permission merge" /usr/bin/jq -e '.permission == {"bash":{"*":"allow","gi
   /^DENY/ { print; print h "/Projects/app/secret"; print "Allow me to note:"; print "~/Documents/private"; print "~/Documents/typo"; print h "/Library"; print "not a path"; next }
   { print }' "$list" > "$list.tmp" && /bin/mv "$list.tmp" "$list"
 
-profile=$("$engine/launch" profile 2>/dev/null) || fail "profile"
+profile=$(cd "$home/Projects/app" && "$engine/launch" profile 2>/dev/null) || fail "profile"
 check "essential DENY refused" /usr/bin/grep -q "refused DENY, OpenCode needs" "$log"
 check "broad ALLOW refused" /usr/bin/grep -q "refused ALLOW, too broad: $home/Library" "$log"
 check "ALLOW / refused" /usr/bin/grep -qx "refused ALLOW, too broad: /" "$log"
@@ -69,6 +74,10 @@ expect no "write opencode config"         sb /usr/bin/touch "$home/.config/openc
 expect no "write symlinked shell profile" sb /bin/sh -c "echo x >> '$home/Projects/dotfiles/zshrc'"
 expect no "write project .opencode"       sb /bin/mkdir -p "$home/Projects/app/.opencode/plugins"
 expect no "write project opencode.json"   sb /usr/bin/touch "$home/Projects/app/opencode.json"
+expect no "write project tui.json"        sb /usr/bin/touch "$home/Projects/app/tui.json"
+expect no "write symlinked bash_login"    sb /bin/sh -c "echo x >> '$home/Projects/dotfiles/bash_login'"
+expect no "write symlinked project config target" sb /bin/sh -c "echo x >> '$home/Projects/dotfiles/oc.json'"
+expect no ".opencode/.gitignore in READ ONLY" sb /bin/sh -c ": > '$home/Projects/archive/.opencode/.gitignore'"
 expect no "exec open"                     sb /usr/bin/open -h
 expect no "exec codesign"                 sb /usr/bin/codesign -h
 expect no "exec diskutil"                 sb /usr/sbin/diskutil list

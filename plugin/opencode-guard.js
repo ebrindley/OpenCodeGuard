@@ -9,8 +9,8 @@ const ENGINE = join(HOME, "Library/Application Support/OpenCodeGuard")
 const STATE = join(ENGINE, "state")
 const LIST = "~/OpenCode Guard/Guard List.txt"
 const SAFE_UNGUARDED = new Set(["invalid", "question", "todowrite", "webfetch", "websearch", "plan_exit", "opencode_guard_status"])
-const READS = new Set(["read", "glob", "grep", "lsp"])
-const CONFIG = /\/\.opencode(\/|$)|\/opencode\.jsonc?$|\/\.cc-safety-net(\/|$)/
+const READS = new Set(["read", "glob", "grep", "list", "lsp"])
+const CONFIG = /\/\.opencode(\/|$)|\/(opencode|tui)\.jsonc?$|\/\.cc-safety-net(\/|$)/
 
 const under = (p, root) => p === root || p.startsWith(root === "/" ? "/" : root + "/")
 
@@ -95,7 +95,8 @@ export const OpenCodeGuard = async input => {
 
   const checkWrite = raw => {
     const p = target(raw)
-    if (protectedRoots.some(r => under(p, r)) || CONFIG.test(p)) throw new Error(`OpenCode Guard: ${p} is protected.`)
+    const lexical = resolve(directory, raw.replace(/^~(?=\/|$)/, HOME))
+    if (protectedRoots.some(r => under(p, r)) || CONFIG.test(p) || CONFIG.test(lexical)) throw new Error(`OpenCode Guard: ${p} is protected.`)
     if (!rules) throw new Error("OpenCode Guard: rules unavailable; relaunch OpenCode.")
     const kind = scope(p)
     if (kind === "deny") throw new Error(`OpenCode Guard: ${p} is in the DENY list (${LIST}).`)

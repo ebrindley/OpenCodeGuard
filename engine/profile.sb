@@ -41,6 +41,7 @@
   (literal (h "/.zlogin"))
   (literal (h "/.profile"))
   (literal (h "/.bash_profile"))
+  (literal (h "/.bash_login"))
   (literal (h "/.bashrc"))
   (literal (param "HOME"))
   (literal (h "/Library"))
@@ -48,9 +49,8 @@
   (literal (h "/.config"))
   (literal (h "/Applications"))
   (regex #"/\.opencode(/|$)")
-  (regex #"/opencode\.jsonc?$")
+  (regex #"/(opencode|tui)\.jsonc?$")
   (require-all (regex #"/\.cc-safety-net(/|$)") (require-not (subpath (h "/.cc-safety-net/logs")))))
-(allow file-write* (regex #"/\.opencode/\.gitignore$"))
 
 (deny lsopen)
 (deny job-creation)

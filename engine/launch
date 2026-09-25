@@ -133,7 +133,8 @@ for p in $deny; do
 done
 
 protected=("$engine" "$list_dir" $home/.config/opencode $home/.opencode $home/.cc-safety-net
-           $home/Library/LaunchAgents $home/.{zshenv,zprofile,zshrc,zlogin,profile,bash_profile,bashrc})
+           $home/Library/LaunchAgents $home/.{zshenv,zprofile,zshrc,zlogin,profile,bash_profile,bash_login,bashrc}
+           "$PWD"/{.opencode,opencode.json,opencode.jsonc,tui.json,tui.jsonc})
 for p in $protected; do
   [[ -e $p && ${p:A} != "$p" ]] || continue
   sbpl "${p:A}"
@@ -217,6 +218,6 @@ case $mode in
   (*) fail "usage: launch cli|gui|profile|check" ;;
 esac
 
-unset ELECTRON_RUN_AS_NODE OPENCODE_SIDECAR_V2
+unset ELECTRON_RUN_AS_NODE OPENCODE_SIDECAR_V2 CC_SAFETY_NET_HOME
 export OPENCODE_SANDBOXED=1 CC_SAFETY_NET_PARANOID_RM=1
 exec $sandbox "$@"
