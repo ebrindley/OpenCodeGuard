@@ -25,6 +25,7 @@ if (mode === "unguarded" || mode === "symlinked") {
   await expect("allowed", "bash allowed", "bash", { command: "ls" })
 } else {
   await expect("allowed", "bash allowed", "bash", { command: "ls" })
+  await expect("blocked", "absolute-path env wrapper", "bash", { command: "/usr/bin/env git reset --hard" })
   await expect("allowed", "edit in ALLOW", "edit", { filePath: "src/index.js" })
   await expect("allowed", "write new file in ALLOW", "write", { filePath: `${home}/Projects/app/a/b/c.txt` })
   await expect("blocked", "write outside lists", "write", { filePath: `${home}/Documents/x.txt` })

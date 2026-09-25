@@ -1,1 +1,1 @@
-{"version":1,"rules":["opencode-guard"],"overrides":{},"transparent_wrappers":[]}
+{"version":1,"rules":["opencode-guard"],"overrides":{},"transparent_wrappers":["env"]}

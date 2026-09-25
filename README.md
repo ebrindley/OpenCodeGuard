@@ -33,7 +33,7 @@ DENY always wins. Between ALLOW and READ ONLY, the more specific path wins. Fold
 ## How it works
 
 - **Sandbox.** OpenCode (CLI and Desktop) runs under a macOS Seatbelt profile built from the list at each launch. Every process OpenCode starts inherits it. Writes are denied everywhere except ALLOW folders and what OpenCode itself needs. DENY blocks reads too. Always protected, including through symlinks: the guard, the list, OpenCode's global config, any `.cc-safety-net` settings, shell startup files and LaunchAgents. Also protected: any project `.opencode` folder, `opencode.json` or `tui.json` (these load code at the next start). If one of these is a symlink, its target is protected only when OpenCode is started from that project in a terminal; otherwise only the name is, and the plugin refuses edits through it. Launching apps, `osascript`, `osacompile`, `codesign`, `launchctl`, `diskutil` and `sudo` are blocked.
-- **Plugin.** Refuses edits and reads that the list forbids with a clear message, before the sandbox has to, and runs **[cc-safety-net](https://github.com/kenryu42/claude-code-safety-net)** (bundled, MIT), which blocks common destructive shell commands such as `git reset --hard`, force pushes and recursive `rm` (`rm -rf` also inside `bash -c`, but not `rm -r` without `-f` there). It catches careless commands, not deliberate workarounds such as a Python script that deletes a folder. If OpenCode was started without the guard, every tool that touches files or runs commands is refused. It registers an `opencode_guard_status` tool; the installer's self-test starts OpenCode inside the guard and checks that it is present.
+- **Plugin.** Refuses edits and reads that the list forbids with a clear message, before the sandbox has to, and runs **[cc-safety-net](https://github.com/kenryu42/cc-safety-net)** (bundled, MIT), which blocks common destructive shell commands such as `git reset --hard`, force pushes and recursive `rm` (`rm -rf` also inside `bash -c`, but not `rm -r` without `-f` there). It catches careless commands, not deliberate workarounds such as a Python script that deletes a folder. If OpenCode was started without the guard, every tool that touches files or runs commands is refused. It registers an `opencode_guard_status` tool; the installer's self-test starts OpenCode inside the guard and checks that it is present.
 
 ## Limits
 
@@ -53,7 +53,7 @@ DENY always wins. Between ALLOW and READ ONLY, the more specific path wins. Fold
 
 ## Uninstall
 
-`zsh ~/Library/Application\ Support/OpenCodeGuard/uninstall.sh` — removes the guard but leaves your list, the OpenCode config file and `.gitignore` it created, and cc-safety-net logs. The installer sets `edit`, `bash` and `external_directory` to allow (keeping any finer rules); uninstall restores each one it changed unless you have changed it since. If restoring fails, it keeps a copy of the saved values in `~/OpenCode Guard/`.
+`zsh ~/Library/Application\ Support/OpenCodeGuard/uninstall.sh` — removes the guard but leaves your list, the OpenCode config file and `.gitignore` it created, cc-safety-net logs, and the `env` entry it added to cc-safety-net's `transparent_wrappers`. The installer sets `edit`, `bash` and `external_directory` to allow (keeping any finer rules); uninstall restores each one it changed unless you have changed it since. If restoring fails, it keeps a copy of the saved values in `~/OpenCode Guard/`.
 
 ## Development
 
