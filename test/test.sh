@@ -37,9 +37,9 @@ check "zprofile without final newline kept intact" /usr/bin/grep -Fxq 'alias x=y
 check "permission merge" /usr/bin/jq -e '.permission == {"bash":{"*":"allow","git *":"allow","rm *":"deny"},"task":"ask","edit":"allow","external_directory":"allow"} and (.permission.bash | keys_unsorted[0]) == "*"' "$cfg"
 
 /usr/bin/awk -v h="$home" '
-  /^ALLOW/ { print; print h "/Projects/archive/live"; print h "/Library"; print "/"; next }
-  /^READ ONLY/ { print; print h "/Projects/archive"; print "~"; next }
-  /^DENY/ { print; print h "/Projects/app/secret"; print "Allow me to note:"; print "~/Documents/private"; print "~/Documents/typo"; print h "/Library"; print "not a path"; next }
+  /^ALLOW -/ { print; print h "/Projects/archive/live"; print h "/Library"; print "/"; next }
+  /^READ ONLY -/ { print; print h "/Projects/archive"; print "~"; next }
+  /^DENY -/ { print; print h "/Projects/app/secret"; print "Allow me to note:"; print "~/Documents/private"; print "~/Documents/typo"; print h "/Library"; print "not a path"; next }
   { print }' "$list" > "$list.tmp" && /bin/mv "$list.tmp" "$list"
 
 profile=$(cd "$home/Projects/app" && "$engine/launch" profile 2>/dev/null) || fail "profile"

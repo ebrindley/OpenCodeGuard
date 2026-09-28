@@ -2,7 +2,7 @@
 
 # OpenCode Guard
 
-Guardrails for [OpenCode](https://opencode.ai) on macOS. Agents keep full tool permissions and broad read access, but can only change or delete files in folders you allow, can never touch folders you deny, and cannot edit the guard itself.
+Guardrails for [OpenCode](https://opencode.ai) on macOS. Agents keep full tool permissions and broad read access, but can only change or delete files in folders you allow (plus the data, cache and temp folders OpenCode needs for itself), can never touch folders you deny, and cannot edit the guard itself.
 
 No dependencies beyond macOS 15 or later. No admin password.
 
