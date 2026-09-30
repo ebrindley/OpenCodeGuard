@@ -203,6 +203,7 @@ case $mode in
       pid=$!
       ids=
       for i in {1..40}; do
+        kill -0 $pid 2>/dev/null || break
         url=$(/usr/bin/grep -o 'http://127\.0\.0\.1:[0-9]*' "$out" 2>/dev/null | head -1) || true
         [[ -n $url ]] && ids=$(/usr/bin/curl -sf --max-time 5 "$url/experimental/tool/ids?directory=${darwin_temp// /%20}" 2>/dev/null) &&
           [[ $ids == *'"opencode_guard_status"'* ]] && break
