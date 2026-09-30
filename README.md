@@ -53,7 +53,7 @@ DENY always wins. Between ALLOW and READ ONLY, the more specific path wins. Fold
 
 ## Uninstall
 
-`zsh ~/Library/Application\ Support/OpenCodeGuard/uninstall.sh` — removes the guard but leaves your list, the OpenCode config file and `.gitignore` it created, cc-safety-net logs, and the `env` entry it added to cc-safety-net's `transparent_wrappers`. The installer sets `edit`, `bash` and `external_directory` to allow (keeping any finer rules); uninstall restores each one it changed unless you have changed it since. If restoring fails, it keeps a copy of the saved values in `~/OpenCode Guard/`.
+`zsh ~/Library/Application\ Support/OpenCodeGuard/uninstall.sh` — removes the guard but leaves your list, the OpenCode config file and `.gitignore` it created, cc-safety-net logs, and the wrapper entries (`env`, `nohup`, `timeout` and similar) it added to cc-safety-net's `transparent_wrappers`. The installer sets `edit`, `bash` and `external_directory` to allow (keeping any finer rules); uninstall restores each one it changed unless you have changed it since. If restoring fails, it keeps a copy of the saved values in `~/OpenCode Guard/`.
 
 ## Development
 
