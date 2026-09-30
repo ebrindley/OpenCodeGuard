@@ -95,6 +95,8 @@ PATH="$home/fakebin:$PATH" OPENCODE_SANDBOXED=1 "$engine/bin/opencode" >/dev/nul
 
 if command -v node >/dev/null; then
   plugin="$home/.config/opencode/plugins/opencode-guard.js"
+  /bin/mkdir -p "$home/Projects/net/rules"
+  print -r -- '{"version":1,"rules":[],"overrides":{},"transparent_wrappers":["env"]}' > "$home/Projects/net/rules/rule.json"
   node "$root/test/plugin.mjs" "$plugin" unguarded || fails=$((fails + 1))
   OPENCODE_GUARD_BYPASS=1 node "$root/test/plugin.mjs" "$plugin" bypass || fails=$((fails + 1))
   sb "$(command -v node)" "$root/test/plugin.mjs" "$plugin" guarded || fails=$((fails + 1))
