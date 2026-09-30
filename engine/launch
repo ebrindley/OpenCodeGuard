@@ -198,7 +198,7 @@ case $mode in
     (( rc == 71 )) && print "ok   open denied" || { print "FAIL open allowed"; ok=0 }
     /bin/rm -f "$probe" "$tmp"
     if next_opencode; then
-      out="$darwin_temp/opencode-guard-serve.$$"
+      out="$engine/state/.serve.$$"
       OPENCODE_SANDBOXED=1 $sandbox -D GUI=0 "$REPLY" serve --hostname 127.0.0.1 --port $(( 20000 + RANDOM % 30000 )) > "$out" 2>&1 &
       pid=$!
       ids=
