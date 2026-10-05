@@ -2,13 +2,35 @@
 
 # OpenCode Guard
 
+## Deprecated
+
+OpenCode Guard has been replaced by [Agent Guard](https://github.com/ebrindley/AgentGuard).
+Use Agent Guard for new installations and future updates. This repository and
+its [v1.0.4 release](https://github.com/ebrindley/OpenCodeGuard/releases/tag/v1.0.4)
+are retained for recovery.
+
+To migrate, quit OpenCode and run this from Terminal outside any agent session
+or sandbox, on macOS 15 or later:
+
+```sh
+/bin/zsh -c "$(/usr/bin/curl -fsSL https://github.com/ebrindley/AgentGuard/releases/latest/download/install.sh)"
+```
+
+The installer asks before importing your Guard List and keeps the permission
+record needed for uninstall. A failed migration rolls back. After a successful
+migration, use Agent Guard's app or `opencode` in a new terminal. See the
+[migration instructions](https://github.com/ebrindley/AgentGuard/blob/main/docs/OPERATIONS.md#moving-from-opencode-guard).
+
+To return to OpenCode Guard, run `agent-guard uninstall`, then install v1.0.4
+from the retained release. The instructions below describe that legacy version.
+
 Guardrails for [OpenCode](https://opencode.ai) on macOS. Agents keep full tool permissions and broad read access, but can only change or delete files in folders you allow (plus the data, cache and temp folders OpenCode needs for itself), can never touch folders you deny, and cannot edit the guard itself.
 
 No dependencies beyond macOS 15 or later. Installs only into your home folder.
 
 ## Install
 
-1. Download [`OpenCodeGuard.dmg`](https://github.com/ebrindley/OpenCodeGuard/releases/latest/download/OpenCodeGuard.dmg) (or the [`.zip`](https://github.com/ebrindley/OpenCodeGuard/releases/latest/download/OpenCodeGuard.zip)) and open it.
+1. Download [`OpenCodeGuard.dmg`](https://github.com/ebrindley/OpenCodeGuard/releases/download/v1.0.4/OpenCodeGuard.dmg) (or the [`.zip`](https://github.com/ebrindley/OpenCodeGuard/releases/download/v1.0.4/OpenCodeGuard.zip)) and open it.
 2. Double-click **Install OpenCode Guard**. It isn't signed or notarized by Apple, so macOS blocks it the first time. Click **Done** (not Move to Trash), then open **System Settings → Privacy & Security**, scroll down to **Security**, and click **Open Anyway** next to Install OpenCode Guard. The button appears for about an hour after you try to open the app. Confirm, and enter your login password. You'll have to do this after downloading.
 3. Choose your projects folder. At the end, click **Edit List** to review your allow and deny list.
 
